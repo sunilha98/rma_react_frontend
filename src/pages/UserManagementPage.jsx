@@ -17,6 +17,8 @@ const UserManagementPage = () => {
     role: ''
   });
   const [editingId, setEditingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterRole, setFilterRole] = useState('');
 
   const roles = [
     'SUPER_ADMIN',
@@ -26,10 +28,20 @@ const UserManagementPage = () => {
     'Practice Heads'
   ];
 
+  const getRoleIcon = (role) => {
+    const iconMap = {
+      'SUPER_ADMIN': 'bi bi-shield-fill-check',
+      'RMT': 'bi bi-tools',
+      'PROJECT_MANAGER': 'bi bi-kanban-fill',
+      'Finance Controllers': 'bi bi-currency-dollar',
+      'Practice Heads': 'bi bi-people-fill'
+    };
+    return iconMap[role] || 'bi bi-person-circle';
+  };
+
   const fetchUsers = async () => {
     try {
       const res = await api.get('/users');
-      // Format date columns for readability
       const formatted = res.data.map(user => ({
         ...user,
         createdAt: formatDate(user.createdAt),
@@ -55,7 +67,7 @@ const UserManagementPage = () => {
     setFormData({
       username: user.username,
       email: user.email,
-      password: '', // Do not prefill password
+      password: '',
       firstName: user.firstName || '',
       lastName: user.lastName || '',
       role: user.role
@@ -85,93 +97,481 @@ const UserManagementPage = () => {
     }
   };
 
+  
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.lastName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = !filterRole || user.role === filterRole;
+    return matchesSearch && matchesRole;
+  });
+
   const columns = [
-    { header: 'Username', accessor: 'username' },
-    { header: 'Email', accessor: 'email' },
-    { header: 'Role', accessor: 'role' },
+    { 
+      header: 'User', 
+      accessor: 'username',
+      render: (user) => (
+        <div className="d-flex align-items-center">
+          <div 
+            className="d-flex align-items-center justify-content-center me-3 rounded-circle"
+            style={{
+              width: '40px',
+              height: '40px',
+              background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2))',
+              border: '2px solid rgba(102, 126, 234, 0.3)'
+            }}
+          >
+            <i className={`${getRoleIcon(user.role)} text-primary`}></i>
+          </div>
+          <div>
+            <div className="fw-semibold text-dark">{user.username}</div>
+            <small className="text-muted">{user.email}</small>
+          </div>
+        </div>
+      )
+    },
+    { 
+      header: 'Role', 
+      accessor: 'role',
+      render: (user) => (
+        <span 
+          className="badge rounded-pill px-3 py-2 d-inline-flex align-items-center"
+          style={{
+            background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1))',
+            color: '#667eea',
+            border: '1px solid rgba(102, 126, 234, 0.2)',
+            fontSize: '12px',
+            fontWeight: '500'
+          }}
+        >
+          <i className={`${getRoleIcon(user.role)} me-1`} style={{ fontSize: '10px' }}></i>
+          {user.role?.replace('_', ' ')}
+        </span>
+      )
+    },
     { header: 'First Name', accessor: 'firstName' },
     { header: 'Last Name', accessor: 'lastName' },
-    { header: 'Created By', accessor: 'createdBy' },
-    { header: 'Created Date', accessor: 'createdAt' },
-    { header: 'Updated By', accessor: 'updatedBy' },
-    { header: 'Updated Date', accessor: 'updatedAt' }
+    { 
+      header: 'Created', 
+      accessor: 'createdAt',
+      render: (user) => (
+        <div>
+          <div className="fw-normal text-dark">{user.createdAt}</div>
+          <small className="text-muted">by {user.createdBy}</small>
+        </div>
+      )
+    },
+    { 
+      header: 'Updated', 
+      accessor: 'updatedAt',
+      render: (user) => (
+        <div>
+          <div className="fw-normal text-dark">{user.updatedAt}</div>
+          <small className="text-muted">by {user.updatedBy}</small>
+        </div>
+      )
+    }
   ];
 
   const actions = [
-    { label: 'Edit', onClick: handleEdit },
-    { label: 'Delete', onClick: handleDelete }
+    { 
+      label: 'Edit', 
+      onClick: handleEdit,
+      icon: 'bi bi-pencil-square',
+      className: 'btn-outline-primary'
+    },
+    { 
+      label: 'Delete', 
+      onClick: handleDelete,
+      icon: 'bi bi-trash3',
+      className: 'btn-outline-danger'
+    }
   ];
 
   return (
     <>
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h3>User Management</h3>
-        <button className="btn btn-primary" onClick={handleAdd}>Add User</button>
+      <style>{`
+        .gradient-header {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #4ECDC4 50%, #45B7D1 75%, #96CEB4 100%);
+          backdrop-filter: blur(10px);
+        }
+        
+        .glass-card {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .gradient-btn {
+          background: linear-gradient(135deg, #667eea, #764ba2);
+          border: none;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .gradient-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+          background: linear-gradient(135deg, #764ba2, #667eea);
+        }
+        
+        .search-input, .filter-select {
+          background: rgba(255, 255, 255, 0.9);
+          border: 1px solid rgba(102, 126, 234, 0.2);
+          backdrop-filter: blur(10px);
+          transition: all 0.3s ease;
+        }
+        
+        .search-input:focus, .filter-select:focus {
+          border-color: #667eea;
+          box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+          background: rgba(255, 255, 255, 1);
+        }
+        
+        .stats-card {
+          background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+          border: 1px solid rgba(102, 126, 234, 0.2);
+          backdrop-filter: blur(10px);
+          transition: transform 0.3s ease;
+        }
+        
+        .stats-card:hover {
+          transform: translateY(-2px);
+        }
+        
+        .modal-glass {
+          background: rgba(255, 255, 255, 0.95) !important;
+          backdrop-filter: blur(20px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        }
+        
+        .form-control-glass {
+          background: rgba(255, 255, 255, 0.8);
+          border: 1px solid rgba(102, 126, 234, 0.2);
+          backdrop-filter: blur(10px);
+        }
+        
+        .form-control-glass:focus {
+          background: rgba(255, 255, 255, 0.95);
+          border-color: #667eea;
+          box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+        }
+      `}</style>
+
+      
+      <div 
+        className="gradient-header p-4 mb-4 rounded-4 text-white position-relative overflow-hidden"
+        style={{ marginTop: '-20px', marginLeft: '-20px', marginRight: '-20px' }}
+      >
+        <div className="position-absolute top-0 start-0 w-100 h-100" style={{
+          background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+        }}></div>
+        
+        <div className="position-relative">
+          <div className="d-flex justify-content-between align-items-center">
+            <div className="d-flex align-items-center">
+              <div 
+                className="d-flex align-items-center justify-content-center me-3 rounded-3"
+                style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  width: '50px',
+                  height: '50px',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255,255,255,0.2)'
+                }}
+              >
+                <i className="bi bi-people-fill fs-4"></i>
+              </div>
+              <div>
+                <h3 className="mb-1 fw-bold">User Management</h3>
+                <p className="mb-0 opacity-75">Manage system users and their roles</p>
+              </div>
+            </div>
+            
+            <button 
+              className="btn btn-light gradient-btn text-white px-4 py-2 rounded-3 d-flex align-items-center"
+              onClick={handleAdd}
+            >
+              <i className="bi bi-person-plus-fill me-2"></i>
+              Add User
+            </button>
+          </div>
+        </div>
       </div>
 
-      <Table columns={columns} data={users} actions={actions} />
+      
+      <div className="row mb-4">
+        <div className="col-md-3">
+          <div className="stats-card p-3 rounded-3 text-center">
+            <i className="bi bi-people text-primary fs-2 mb-2"></i>
+            <h4 className="fw-bold mb-1 text-primary">{users.length}</h4>
+            <small className="text-muted">Total Users</small>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="stats-card p-3 rounded-3 text-center">
+            <i className="bi bi-shield-check text-success fs-2 mb-2"></i>
+            <h4 className="fw-bold mb-1 text-success">
+              {users.filter(u => u.role === 'SUPER_ADMIN').length}
+            </h4>
+            <small className="text-muted">Super Admins</small>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="stats-card p-3 rounded-3 text-center">
+            <i className="bi bi-kanban text-info fs-2 mb-2"></i>
+            <h4 className="fw-bold mb-1 text-info">
+              {users.filter(u => u.role === 'PROJECT_MANAGER').length}
+            </h4>
+            <small className="text-muted">Project Managers</small>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="stats-card p-3 rounded-3 text-center">
+            <i className="bi bi-tools text-warning fs-2 mb-2"></i>
+            <h4 className="fw-bold mb-1 text-warning">
+              {users.filter(u => u.role === 'RMT').length}
+            </h4>
+            <small className="text-muted">RMT Users</small>
+          </div>
+        </div>
+      </div>
 
+      
+      <div className="glass-card p-3 rounded-3 mb-4">
+        <div className="row align-items-center">
+          <div className="col-md-6">
+            <div className="position-relative">
+              <i className="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+              <input
+                type="text"
+                className="form-control search-input ps-5 rounded-3"
+                placeholder="Search users by name, username, or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="col-md-4">
+            <select
+              className="form-select filter-select rounded-3"
+              value={filterRole}
+              onChange={(e) => setFilterRole(e.target.value)}
+            >
+              <option value="">All Roles</option>
+              {roles.map((role, idx) => (
+                <option key={idx} value={role}>{role.replace('_', ' ')}</option>
+              ))}
+            </select>
+          </div>
+          <div className="col-md-2">
+            <div className="text-muted small">
+              Showing {filteredUsers.length} of {users.length} users
+            </div>
+          </div>
+        </div>
+      </div>
+
+      
+      <div className="glass-card rounded-3 overflow-hidden">
+        <div className="table-responsive">
+          <table className="table table-hover mb-0 custom-table">
+            <thead>
+              <tr className="gradient-header-table">
+                {columns.map((column, index) => (
+                  <th key={index} className="border-0 text-white fw-semibold py-3 px-4">
+                    <div className="d-flex align-items-center">
+                      <span>{column.header}</span>
+                      {column.sortable && (
+                        <i className="bi bi-chevron-expand ms-2 opacity-75" style={{ fontSize: '12px' }}></i>
+                      )}
+                    </div>
+                  </th>
+                ))}
+                <th className="border-0 text-white fw-semibold py-3 px-4 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length + 1} className="text-center py-5 text-muted">
+                    <div className="d-flex flex-column align-items-center">
+                      <i className="bi bi-inbox display-1 mb-3 opacity-25"></i>
+                      <h5 className="mb-2">No users found</h5>
+                      <p className="mb-0">Try adjusting your search or filter criteria</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredUsers.map((user, index) => (
+                  <tr key={user.id || index} className="table-row-custom">
+                    {columns.map((column, colIndex) => (
+                      <td key={colIndex} className="border-0 py-3 px-4 align-middle">
+                        {column.render ? column.render(user) : (
+                          <span className="text-dark fw-normal">
+                            {user[column.accessor] || '-'}
+                          </span>
+                        )}
+                      </td>
+                    ))}
+                    <td className="border-0 py-3 px-4 align-middle text-center">
+                      <div className="btn-group" role="group">
+                        {actions.map((action, actionIndex) => (
+                          <button
+                            key={actionIndex}
+                            type="button"
+                            className={`btn btn-sm ${action.className || 'btn-outline-primary'} action-btn d-flex align-items-center`}
+                            onClick={() => action.onClick(user)}
+                            title={action.label}
+                          >
+                            {action.icon && <i className={`${action.icon} me-1`}></i>}
+                            <span className="d-none d-md-inline">{action.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+       
+        {filteredUsers.length > 0 && (
+          <div 
+            className="px-4 py-3 border-top d-flex justify-content-between align-items-center"
+            style={{ 
+              background: 'rgba(102, 126, 234, 0.05)',
+              borderTop: '1px solid rgba(102, 126, 234, 0.1)' 
+            }}
+          >
+            <div className="d-flex align-items-center text-muted small">
+              <i className="bi bi-info-circle me-2"></i>
+              Showing {filteredUsers.length} of {users.length} users
+            </div>
+            <div className="d-flex align-items-center">
+              <span className="text-muted small me-3">
+                {searchTerm || filterRole ? 'Filtered results' : 'All users displayed'}
+              </span>
+              {(searchTerm || filterRole) && (
+                <button 
+                  className="btn btn-sm btn-outline-secondary rounded-pill"
+                  onClick={() => { setSearchTerm(''); setFilterRole(''); }}
+                >
+                  <i className="bi bi-x-lg me-1"></i>Clear filters
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      
       <CustomModal
         show={modalOpen}
         onHide={() => setModalOpen(false)}
-        title={editingId ? 'Edit User' : 'Add User'}
+        title={
+          <div className="d-flex align-items-center">
+            <div 
+              className="d-flex align-items-center justify-content-center me-3 rounded-2"
+              style={{
+                background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                width: '40px',
+                height: '40px'
+              }}
+            >
+              <i className={`bi ${editingId ? 'bi-pencil-square' : 'bi-person-plus'} text-white`}></i>
+            </div>
+            <span>{editingId ? 'Edit User' : 'Add New User'}</span>
+          </div>
+        }
         onSave={handleSave}
+        className="modal-glass"
       >
-        <div className="mb-3">
-          <label className="form-label">Username</label>
-          <input
-            type="text"
-            className="form-control"
-            value={formData.username}
-            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-          />
+        <div className="row">
+          <div className="col-md-6 mb-3">
+            <label className="form-label fw-semibold">
+              <i className="bi bi-person me-1"></i>Username
+            </label>
+            <input
+              type="text"
+              className="form-control form-control-glass rounded-3"
+              value={formData.username}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              placeholder="Enter username"
+            />
+          </div>
+          <div className="col-md-6 mb-3">
+            <label className="form-label fw-semibold">
+              <i className="bi bi-envelope me-1"></i>Email
+            </label>
+            <input
+              type="email"
+              className="form-control form-control-glass rounded-3"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="Enter email address"
+            />
+          </div>
         </div>
+        
         <div className="mb-3">
-          <label className="form-label">Password</label>
+          <label className="form-label fw-semibold">
+            <i className="bi bi-lock me-1"></i>Password
+          </label>
           <input
             type="password"
-            className="form-control"
+            className="form-control form-control-glass rounded-3"
             value={formData.password}
             onChange={(e) => setFormData({ ...formData, password: e.target.value })}
             autoComplete="new-password"
+            placeholder={editingId ? "Leave empty to keep current password" : "Enter password"}
           />
         </div>
-        <div className="mb-3">
-          <label className="form-label">First Name</label>
-          <input
-            type="text"
-            className="form-control"
-            value={formData.firstName}
-            onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-          />
+        
+        <div className="row">
+          <div className="col-md-6 mb-3">
+            <label className="form-label fw-semibold">
+              <i className="bi bi-person-badge me-1"></i>First Name
+            </label>
+            <input
+              type="text"
+              className="form-control form-control-glass rounded-3"
+              value={formData.firstName}
+              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+              placeholder="Enter first name"
+            />
+          </div>
+          <div className="col-md-6 mb-3">
+            <label className="form-label fw-semibold">
+              <i className="bi bi-person-badge-fill me-1"></i>Last Name
+            </label>
+            <input
+              type="text"
+              className="form-control form-control-glass rounded-3"
+              value={formData.lastName}
+              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+              placeholder="Enter last name"
+            />
+          </div>
         </div>
+        
         <div className="mb-3">
-          <label className="form-label">Last Name</label>
-          <input
-            type="text"
-            className="form-control"
-            value={formData.lastName}
-            onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Email</label>
-          <input
-            type="email"
-            className="form-control"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Role</label>
+          <label className="form-label fw-semibold">
+            <i className="bi bi-shield-check me-1"></i>Role
+          </label>
           <select
+            className="form-select form-control-glass rounded-3"
             value={formData.role}
             onChange={(e) => setFormData({ ...formData, role: e.target.value })}
           >
             <option value="">Select Role</option>
             {roles.map((role, idx) => (
-              <option key={idx} value={role}>{role}</option>
+              <option key={idx} value={role}>
+                {role.replace('_', ' ')}
+              </option>
             ))}
           </select>
         </div>
@@ -179,4 +579,5 @@ const UserManagementPage = () => {
     </>
   );
 };
+
 export default UserManagementPage;
