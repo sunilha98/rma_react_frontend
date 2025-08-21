@@ -1,14 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 
 const Layout = ({ children }) => {
+ 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isMobile, setIsMobile] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
+   
+    const checkMobile = () => {
+      if (typeof window !== 'undefined') {
+        return window.innerWidth <= 768;
+      }
+      return false;
+    };
+
+    // Set initial mobile state
+    const mobile = checkMobile();
+    setIsMobile(mobile);
+    if (mobile) {
+      setSidebarCollapsed(true);
+    }
+
     const handleResize = () => {
-      const mobile = window.innerWidth <= 768;
+      const mobile = checkMobile();
       setIsMobile(mobile);
       if (mobile) {
         setSidebarCollapsed(true);
@@ -21,6 +37,12 @@ const Layout = ({ children }) => {
 
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
+  };
+
+  const scrollToTop = () => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   return (
@@ -111,13 +133,12 @@ const Layout = ({ children }) => {
           className="flex-grow-1 p-4 position-relative"
           style={{
             background: 'transparent',
-            overflowY: 'auto',
-            scrollBehavior: 'smooth'
+            overflow: 'visible'
           }}
         >
           
           <div 
-            className="container-fluid h-100"
+            className="container-fluid"
             style={{
               background: 'rgba(255,255,255,0.7)',
               backdropFilter: 'blur(15px)',
@@ -125,9 +146,8 @@ const Layout = ({ children }) => {
               border: '1px solid rgba(255,255,255,0.2)',
               boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
               padding: '2rem',
-              minHeight: 'calc(100vh - 140px)',
               position: 'relative',
-              overflow: 'hidden'
+              overflow: 'visible'
             }}
           >
             
@@ -177,7 +197,7 @@ const Layout = ({ children }) => {
               e.target.style.transform = 'scale(1)';
               e.target.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.4)';
             }}
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            onClick={scrollToTop}
           >
             <i className="bi bi-arrow-up text-white fs-5"></i>
           </button>
@@ -185,7 +205,7 @@ const Layout = ({ children }) => {
       </div>
 
       <style>{`
-        /* Smooth scrollbar styling */
+        /*
         main {
           scrollbar-width: thin;
           scrollbar-color: rgba(102, 126, 234, 0.3) transparent;
@@ -207,6 +227,7 @@ const Layout = ({ children }) => {
         main::-webkit-scrollbar-thumb:hover {
           background: linear-gradient(135deg, rgba(102, 126, 234, 0.5), rgba(118, 75, 162, 0.5));
         }
+        */
         
         
         @media (max-width: 768px) {

@@ -7,6 +7,8 @@ import { formatDate } from '../utils/dateUtils';
 
 const UserManagementPage = () => {
   const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
@@ -39,17 +41,62 @@ const UserManagementPage = () => {
     return iconMap[role] || 'bi bi-person-circle';
   };
 
+  const safeDateFormat = (dateString) => {
+    try {
+      if (!dateString) return 'N/A';
+      return formatDate(dateString);
+    } catch (error) {
+      console.warn('Date formatting error:', error);
+      return dateString || 'N/A';
+    }
+  };
+
   const fetchUsers = async () => {
     try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('Fetching users...');
       const res = await api.get('/users');
-      const formatted = res.data.map(user => ({
-        ...user,
-        createdAt: formatDate(user.createdAt),
-        updatedAt: formatDate(user.updatedAt)
-      }));
+      console.log('Raw API response:', res);
+      
+      if (!res || !res.data) {
+        throw new Error('Invalid API response structure');
+      }
+
+      
+      const userData = Array.isArray(res.data) ? res.data : [];
+      console.log('User data:', userData);
+
+      const formatted = userData.map((user, index) => {
+        console.log(`Processing user ${index}:`, user);
+        
+        return {
+          id: user.id || index,
+          username: user.username || 'Unknown',
+          email: user.email || 'No email',
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          role: user.role || 'No role',
+          createdAt: safeDateFormat(user.createdAt),
+          updatedAt: safeDateFormat(user.updatedAt),
+          createdBy: user.createdBy || 'System',
+          updatedBy: user.updatedBy || 'System',
+          ...user
+        };
+      });
+
+      console.log('Formatted users:', formatted);
       setUsers(formatted);
     } catch (err) {
       console.error('Failed to fetch users:', err);
+      console.error('Error response:', err.response?.data);
+      console.error('Error status:', err.response?.status);
+      
+      setError(err.message || 'Failed to fetch users');
+      setUsers([]); 
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,19 +105,26 @@ const UserManagementPage = () => {
   }, []);
 
   const handleAdd = () => {
-    setFormData({ username: '', email: '', password: '', firstName: '', lastName: '', role: '' });
+    setFormData({ 
+      username: '', 
+      email: '', 
+      password: '', 
+      firstName: '', 
+      lastName: '', 
+      role: '' 
+    });
     setEditingId(null);
     setModalOpen(true);
   };
 
   const handleEdit = (user) => {
     setFormData({
-      username: user.username,
-      email: user.email,
+      username: user.username || '',
+      email: user.email || '',
       password: '',
       firstName: user.firstName || '',
       lastName: user.lastName || '',
-      role: user.role
+      role: user.role || ''
     });
     setEditingId(user.id);
     setModalOpen(true);
@@ -78,8 +132,13 @@ const UserManagementPage = () => {
 
   const handleDelete = async (user) => {
     if (window.confirm(`Delete user "${user.username}"?`)) {
-      await api.delete(`/users/${user.id}`);
-      fetchUsers();
+      try {
+        await api.delete(`/users/${user.id}`);
+        fetchUsers();
+      } catch (err) {
+        console.error('Failed to delete user:', err);
+        alert('Failed to delete user. Please try again.');
+      }
     }
   };
 
@@ -94,18 +153,59 @@ const UserManagementPage = () => {
       fetchUsers();
     } catch (err) {
       console.error('Failed to save user:', err);
+      alert('Failed to save user. Please try again.');
     }
   };
 
-  
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.lastName?.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!user) return false;
+    
+    const searchFields = [
+      user.username,
+      user.email,
+      user.firstName,
+      user.lastName
+    ].filter(Boolean); 
+    
+    const matchesSearch = !searchTerm || searchFields.some(field => 
+      field.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
     const matchesRole = !filterRole || user.role === filterRole;
     return matchesSearch && matchesRole;
   });
+
+  if (error && !loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center py-5">
+        <div className="text-center">
+          <i className="bi bi-exclamation-triangle display-1 text-warning mb-3"></i>
+          <h4 className="mb-3">Error Loading Users</h4>
+          <p className="text-muted mb-3">{error}</p>
+          <button 
+            className="btn btn-primary" 
+            onClick={fetchUsers}
+          >
+            <i className="bi bi-arrow-clockwise me-2"></i>
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center py-5">
+        <div className="text-center">
+          <div className="spinner-border text-primary mb-3" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="text-muted">Loading users...</p>
+        </div>
+      </div>
+    );
+  }
 
   const columns = [
     { 
@@ -114,19 +214,19 @@ const UserManagementPage = () => {
       render: (user) => (
         <div className="d-flex align-items-center">
           <div 
-            className="d-flex align-items-center justify-content-center me-3 rounded-circle"
+            className="d-flex align-items-center justify-content-center me-2 rounded-circle"
             style={{
-              width: '40px',
-              height: '40px',
+              width: '32px',
+              height: '32px',
               background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2))',
               border: '2px solid rgba(102, 126, 234, 0.3)'
             }}
           >
-            <i className={`${getRoleIcon(user.role)} text-primary`}></i>
+            <i className={`${getRoleIcon(user.role)} text-primary`} style={{ fontSize: '14px' }}></i>
           </div>
           <div>
-            <div className="fw-semibold text-dark">{user.username}</div>
-            <small className="text-muted">{user.email}</small>
+            <div className="fw-semibold text-dark" style={{ fontSize: '13px' }}>{user.username || 'Unknown'}</div>
+            <small className="text-muted" style={{ fontSize: '11px' }}>{user.email || 'No email'}</small>
           </div>
         </div>
       )
@@ -136,39 +236,36 @@ const UserManagementPage = () => {
       accessor: 'role',
       render: (user) => (
         <span 
-          className="badge rounded-pill px-3 py-2 d-inline-flex align-items-center"
+          className="badge rounded-pill px-2 py-1 d-inline-flex align-items-center"
           style={{
             background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1))',
             color: '#667eea',
             border: '1px solid rgba(102, 126, 234, 0.2)',
-            fontSize: '12px',
+            fontSize: '10px',
             fontWeight: '500'
           }}
         >
-          <i className={`${getRoleIcon(user.role)} me-1`} style={{ fontSize: '10px' }}></i>
-          {user.role?.replace('_', ' ')}
+          <i className={`${getRoleIcon(user.role)} me-1`} style={{ fontSize: '8px' }}></i>
+          {user.role?.replace('_', ' ') || 'No role'}
         </span>
       )
     },
-    { header: 'First Name', accessor: 'firstName' },
-    { header: 'Last Name', accessor: 'lastName' },
+    { 
+      header: 'Name', 
+      accessor: 'firstName',
+      render: (user) => (
+        <span style={{ fontSize: '13px' }}>
+          {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '-'}
+        </span>
+      )
+    },
     { 
       header: 'Created', 
       accessor: 'createdAt',
       render: (user) => (
-        <div>
-          <div className="fw-normal text-dark">{user.createdAt}</div>
-          <small className="text-muted">by {user.createdBy}</small>
-        </div>
-      )
-    },
-    { 
-      header: 'Updated', 
-      accessor: 'updatedAt',
-      render: (user) => (
-        <div>
-          <div className="fw-normal text-dark">{user.updatedAt}</div>
-          <small className="text-muted">by {user.updatedBy}</small>
+        <div style={{ fontSize: '12px' }}>
+          <div className="fw-normal text-dark">{user.createdAt || 'Unknown'}</div>
+          <small className="text-muted" style={{ fontSize: '10px' }}>by {user.createdBy || 'System'}</small>
         </div>
       )
     }
@@ -259,7 +356,6 @@ const UserManagementPage = () => {
         }
       `}</style>
 
-      
       <div 
         className="gradient-header p-4 mb-4 rounded-4 text-white position-relative overflow-hidden"
         style={{ marginTop: '-20px', marginLeft: '-20px', marginRight: '-20px' }}
@@ -300,7 +396,6 @@ const UserManagementPage = () => {
         </div>
       </div>
 
-      
       <div className="row mb-4">
         <div className="col-md-3">
           <div className="stats-card p-3 rounded-3 text-center">
@@ -338,7 +433,6 @@ const UserManagementPage = () => {
         </div>
       </div>
 
-      
       <div className="glass-card p-3 rounded-3 mb-4">
         <div className="row align-items-center">
           <div className="col-md-6">
@@ -373,23 +467,22 @@ const UserManagementPage = () => {
         </div>
       </div>
 
-      
       <div className="glass-card rounded-3 overflow-hidden">
-        <div className="table-responsive">
-          <table className="table table-hover mb-0 custom-table">
-            <thead>
-              <tr className="gradient-header-table">
+        <div className="table-responsive" style={{ overflowX: 'visible' }}>
+          <table className="table table-hover mb-0" style={{ minWidth: 'auto' }}>
+            <thead style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)' }}>
+              <tr>
                 {columns.map((column, index) => (
-                  <th key={index} className="border-0 text-white fw-semibold py-3 px-4">
+                  <th key={index} className="border-0 text-white fw-semibold py-3 px-2" style={{ whiteSpace: 'nowrap' }}>
                     <div className="d-flex align-items-center">
-                      <span>{column.header}</span>
+                      <span style={{ fontSize: '14px' }}>{column.header}</span>
                       {column.sortable && (
                         <i className="bi bi-chevron-expand ms-2 opacity-75" style={{ fontSize: '12px' }}></i>
                       )}
                     </div>
                   </th>
                 ))}
-                <th className="border-0 text-white fw-semibold py-3 px-4 text-center">Actions</th>
+                <th className="border-0 text-white fw-semibold py-3 px-2 text-center" style={{ width: '120px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -405,9 +498,9 @@ const UserManagementPage = () => {
                 </tr>
               ) : (
                 filteredUsers.map((user, index) => (
-                  <tr key={user.id || index} className="table-row-custom">
+                  <tr key={user.id || index} style={{ backgroundColor: 'rgba(255,255,255,0.8)' }}>
                     {columns.map((column, colIndex) => (
-                      <td key={colIndex} className="border-0 py-3 px-4 align-middle">
+                      <td key={colIndex} className="border-0 py-2 px-2 align-middle" style={{ fontSize: '13px' }}>
                         {column.render ? column.render(user) : (
                           <span className="text-dark fw-normal">
                             {user[column.accessor] || '-'}
@@ -415,18 +508,19 @@ const UserManagementPage = () => {
                         )}
                       </td>
                     ))}
-                    <td className="border-0 py-3 px-4 align-middle text-center">
+                    <td className="border-0 py-2 px-2 align-middle text-center">
                       <div className="btn-group" role="group">
                         {actions.map((action, actionIndex) => (
                           <button
                             key={actionIndex}
                             type="button"
-                            className={`btn btn-sm ${action.className || 'btn-outline-primary'} action-btn d-flex align-items-center`}
+                            className={`btn btn-sm ${action.className || 'btn-outline-primary'}`}
                             onClick={() => action.onClick(user)}
                             title={action.label}
+                            style={{ fontSize: '11px', padding: '4px 8px' }}
                           >
-                            {action.icon && <i className={`${action.icon} me-1`}></i>}
-                            <span className="d-none d-md-inline">{action.label}</span>
+                            <i className={action.icon}></i>
+                            <span className="d-none d-lg-inline ms-1">{action.label}</span>
                           </button>
                         ))}
                       </div>
@@ -438,7 +532,6 @@ const UserManagementPage = () => {
           </table>
         </div>
 
-       
         {filteredUsers.length > 0 && (
           <div 
             className="px-4 py-3 border-top d-flex justify-content-between align-items-center"
